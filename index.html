@@ -252,10 +252,14 @@
         <div class="card">
           <div class="card-header"><span class="card-title">Actualizar stock</span></div>
           <label>Producto</label>
-          <select id="emp-stock-producto" onchange="empStockCalc()"><option value="">— Seleccioná —</option></select>
-          <div class="row" style="margin-top:12px">
+          <select id="emp-stock-producto" onchange="empStockMostrarCampos()"><option value="">— Seleccioná —</option></select>
+          <div id="emp-stock-campos-cajas" class="row" style="margin-top:12px">
             <div><label>Cajas completas</label><input type="number" id="emp-stock-cajas" placeholder="0" inputmode="numeric" oninput="empStockCalc()" /></div>
             <div><label>Piezas sueltas</label><input type="number" id="emp-stock-piezas" placeholder="0" inputmode="numeric" oninput="empStockCalc()" /></div>
+          </div>
+          <div id="emp-stock-campos-unidades" style="display:none;margin-top:12px">
+            <label>Unidades</label>
+            <input type="number" id="emp-stock-unidades" placeholder="0" inputmode="numeric" oninput="empStockCalc()" style="font-size:22px;padding:12px;" />
           </div>
           <div id="emp-stock-preview" style="display:none;background:#f0f7f0;border-radius:8px;padding:12px;margin-top:12px;text-align:center">
             <div style="font-size:12px;color:#666;margin-bottom:4px">Total en m²</div>
@@ -370,11 +374,18 @@
           <div><label>Placas por m²</label><input type="number" id="prod-placas-m2" placeholder="6.5" step="0.1" inputmode="decimal" /></div>
         </div>
         <label>m² producidos por día</label><input type="number" id="prod-m2dia" placeholder="ej: 50" inputmode="decimal" step="0.1" />
-        <div class="row" style="margin-top:8px">
+        <label style="margin-top:8px">Tipo de stock</label>
+        <select id="prod-tipo-stock" onchange="prodToggleStockFields()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:8px;font-family:inherit;font-size:14px;background:#fff;margin-bottom:8px">
+          <option value="cajas_piezas">Cajas + piezas (m²)</option>
+          <option value="unidades">Unidades</option>
+        </select>
+        <div id="prod-campos-cajas" class="row">
           <div><label>Piezas por caja</label><input type="number" id="prod-piezas-caja" placeholder="ej: 52" inputmode="numeric" /></div>
           <div><label>m² por caja</label><input type="number" id="prod-m2-caja" placeholder="ej: 0.5" step="0.01" inputmode="decimal" /></div>
         </div>
-        <label style="margin-top:14px;font-weight:600;">Ingredientes</label>
+        <label style="margin-top:8px">Costo <span style="font-weight:300;color:#aaa;font-size:12px">(opcional — se suma al cálculo por ingredientes)</span></label>
+        <input type="number" id="prod-costo-manual" placeholder="ej: 850.00" step="0.01" inputmode="decimal" />
+        <label style="margin-top:14px;font-weight:600;">Ingredientes <span style="font-weight:300;color:#aaa;font-size:12px">(opcional)</span></label>
         <div id="ingredientes-form"></div>
         <button class="btn" onclick="agregarIngrediente()" style="margin-top:8px;width:100%"><i class="ti ti-plus"></i> Agregar ingrediente</button>
         <div class="actions"><button class="btn btn-primary" id="btn-guardar" onclick="guardarProducto()" style="flex:1">Guardar producto</button></div>
@@ -536,6 +547,7 @@
         </div>
         <label>Cliente</label><input type="text" id="pto-cliente" placeholder="Nombre del cliente" />
         <label>Teléfono / Email</label><input type="text" id="pto-tel" placeholder="11 1234-5678" />
+        <label>Dirección de entrega</label><input type="text" id="pto-direccion" placeholder="ej: Av. Corrientes 1234, CABA" />
       </div>
 
       <!-- Items -->
@@ -596,6 +608,26 @@
 
     <!-- Stock actual -->
     <div id="stock-stock" class="sub-section active">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Actualizar stock</span></div>
+        <label>Producto</label>
+        <select id="owner-stock-producto" onchange="ownerStockMostrarCampos()"><option value="">— Seleccioná —</option></select>
+        <div id="owner-stock-campos-cajas" class="row" style="margin-top:12px">
+          <div><label>Cajas completas</label><input type="number" id="owner-stock-cajas" placeholder="0" inputmode="numeric" oninput="ownerStockCalc()" /></div>
+          <div><label>Piezas sueltas</label><input type="number" id="owner-stock-piezas" placeholder="0" inputmode="numeric" oninput="ownerStockCalc()" /></div>
+        </div>
+        <div id="owner-stock-campos-unidades" style="display:none;margin-top:12px">
+          <label>Unidades</label>
+          <input type="number" id="owner-stock-unidades" placeholder="0" inputmode="numeric" oninput="ownerStockCalc()" style="font-size:22px;padding:12px;" />
+        </div>
+        <div id="owner-stock-preview" style="display:none;background:#f0f7f0;border-radius:8px;padding:12px;margin-top:12px;text-align:center">
+          <div style="font-size:12px;color:#666;margin-bottom:4px">Total</div>
+          <div id="owner-stock-m2" style="font-size:28px;font-weight:600;color:#2d6a2d">—</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="ownerGuardarStock()" style="flex:1;padding:13px;font-size:16px"><i class="ti ti-device-floppy"></i> Guardar stock</button>
+        </div>
+      </div>
       <div id="owner-stock-lista"><div class="empty">Cargando stock...</div></div>
     </div>
 
@@ -720,7 +752,7 @@ function setupOwnerListeners() {
   }));
   unsubs.push(db.collection('productos').onSnapshot(snap => {
     productos = snap.docs.map(d => ({id:d.id,...d.data()}));
-    renderProductos(); actualizarSelectProducto(); syncProdSelect('p-producto');
+    renderProductos(); actualizarSelectProducto(); syncProdSelect('p-producto'); syncProdSelect('owner-stock-producto');
   }));
   unsubs.push(db.collection('margenes').onSnapshot(snap => {
     if(snap.empty) {
@@ -996,7 +1028,10 @@ function duplicarProducto(id) {
   document.getElementById('prod-m2dia').value=p.m2dia||'';
   document.getElementById('prod-piezas-caja').value=p.piezas_por_caja||'';
   document.getElementById('prod-m2-caja').value=p.m2_por_caja||'';
-  ingTemp=p.ingredientes.map(i=>({...i}));
+  document.getElementById('prod-costo-manual').value=p.costo_manual||'';
+  document.getElementById('prod-tipo-stock').value=p.tipo_stock||'cajas_piezas';
+  prodToggleStockFields();
+  ingTemp=(p.ingredientes||[]).map(i=>({...i}));
   document.getElementById('editing-banner').style.display='none';
   document.getElementById('form-title').textContent='Nuevo producto (duplicado)';
   document.getElementById('btn-guardar').textContent='Guardar como nuevo';
@@ -1011,7 +1046,10 @@ function editarProducto(id) {
   document.getElementById('prod-m2dia').value=p.m2dia||'';
   document.getElementById('prod-piezas-caja').value=p.piezas_por_caja||'';
   document.getElementById('prod-m2-caja').value=p.m2_por_caja||'';
-  ingTemp=p.ingredientes.map(i=>({...i}));
+  document.getElementById('prod-costo-manual').value=p.costo_manual||'';
+  document.getElementById('prod-tipo-stock').value=p.tipo_stock||'cajas_piezas';
+  prodToggleStockFields();
+  ingTemp=(p.ingredientes||[]).map(i=>({...i}));
   document.getElementById('editing-banner').style.display='flex';
   document.getElementById('form-title').textContent='Editar producto';
   document.getElementById('btn-guardar').textContent='Guardar cambios';
@@ -1019,11 +1057,17 @@ function editarProducto(id) {
 }
 function cancelarEdicion() {
   editandoId=null; ingTemp=[];
-  ['prod-nombre','prod-batch','prod-placas-m2','prod-m2dia','prod-piezas-caja','prod-m2-caja'].forEach(id=>document.getElementById(id).value='');
+  ['prod-nombre','prod-batch','prod-placas-m2','prod-m2dia','prod-piezas-caja','prod-m2-caja','prod-costo-manual'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('prod-tipo-stock').value='cajas_piezas';
+  prodToggleStockFields();
   document.getElementById('editing-banner').style.display='none';
   document.getElementById('form-title').textContent='Nuevo producto';
   document.getElementById('btn-guardar').textContent='Guardar producto';
   renderIngredientesForm();
+}
+function prodToggleStockFields() {
+  const tipo = document.getElementById('prod-tipo-stock').value;
+  document.getElementById('prod-campos-cajas').style.display = tipo==='unidades' ? 'none' : '';
 }
 async function guardarProducto() {
   const nombre=document.getElementById('prod-nombre').value.trim();
@@ -1032,10 +1076,11 @@ async function guardarProducto() {
   const m2dia=parseFloat(document.getElementById('prod-m2dia').value)||0;
   const piezas_por_caja=parseFloat(document.getElementById('prod-piezas-caja').value)||0;
   const m2_por_caja=parseFloat(document.getElementById('prod-m2-caja').value)||0;
+  const costo_manual=parseFloat(document.getElementById('prod-costo-manual').value)||0;
   if(!nombre) return alert('Ingresá el nombre del producto.');
+  const tipo_stock = document.getElementById('prod-tipo-stock').value;
   const ings=ingTemp.filter(i=>i.matId&&i.qty>0);
-  if(!ings.length) return alert('Completá los ingredientes.');
-  const data={nombre,batch,placasM2,m2dia,piezas_por_caja,m2_por_caja,ingredientes:ings};
+  const data={nombre,batch,placasM2,m2dia,piezas_por_caja,m2_por_caja,costo_manual,tipo_stock,ingredientes:ings};
   if(editandoId) {
     await db.collection('productos').doc(editandoId).update(data);
     cancelarEdicion();
@@ -1051,9 +1096,11 @@ async function eliminarProducto(id) {
   await db.collection('productos').doc(id).delete();
 }
 function calcularCostoProducto(p) {
+  const extra = p.costo_manual||0;
+  if(!p.ingredientes?.length) return extra||null;
   let total=0;
   for(const ing of p.ingredientes){const mat=materiales.find(m=>m.id==ing.matId);if(!mat)return null;total+=precioPorKg(mat)*ing.qty;}
-  return (total/p.batch)*p.placasM2;
+  return (total/p.batch)*p.placasM2 + extra;
 }
 function renderProductos() {
   const el=document.getElementById('lista-productos'); if(!el) return;
@@ -1514,6 +1561,7 @@ function ptoRecolectar() {
     valido:      document.getElementById('pto-valido').value,
     cliente:     document.getElementById('pto-cliente').value.trim(),
     tel:         document.getElementById('pto-tel').value.trim(),
+    direccion:   document.getElementById('pto-direccion').value.trim(),
     items:       ptoItems.map(it=>({...it})),
     descPct, descMonto, envioMonto,
     envioDesc:   document.getElementById('pto-envio-desc').value.trim(),
@@ -1551,7 +1599,7 @@ async function ptoGuardarYPDF() {
 function ptoCancelar() {
   ptoEditandoId = null; window._ptoEditNum = null;
   ptoItems = [];
-  ['pto-fecha','pto-valido','pto-cliente','pto-tel','pto-desc-pct','pto-envio-desc','pto-envio-monto'].forEach(id=>document.getElementById(id).value='');
+  ['pto-fecha','pto-valido','pto-cliente','pto-tel','pto-direccion','pto-desc-pct','pto-envio-desc','pto-envio-monto'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pto-nota').value='';
   document.getElementById('pto-form-title').textContent = 'Nuevo presupuesto';
   document.getElementById('pto-btn-cancelar').style.display = 'none';
@@ -1565,6 +1613,7 @@ function ptoEditar(id, data) {
   document.getElementById('pto-valido').value      = data.valido||'';
   document.getElementById('pto-cliente').value     = data.cliente||'';
   document.getElementById('pto-tel').value         = data.tel||'';
+  document.getElementById('pto-direccion').value   = data.direccion||'';
   document.getElementById('pto-desc-pct').value    = data.descPct||'';
   document.getElementById('pto-envio-desc').value  = data.envioDesc||'';
   document.getElementById('pto-envio-monto').value = data.envioMonto||'';
@@ -1706,6 +1755,7 @@ function ptoGenerarPDF(data) {
       <div class="lbl">Cliente</div>
       <div class="val">${data.cliente||'—'}</div>
       ${data.tel?`<div style="font-size:9px;color:#aaa;margin-top:2px;letter-spacing:.04em">${data.tel}</div>`:''}
+      ${data.direccion?`<div style="font-size:9px;color:#aaa;margin-top:2px;letter-spacing:.04em"><i>Entrega: ${data.direccion}</i></div>`:''}
     </div>
     <div class="pto-num-blk">
       <div class="num">Presupuesto Nº ${data.numero}</div>
@@ -1908,6 +1958,55 @@ async function pedConfirmarConversion() {
   alert(`Pedido creado desde presupuesto Nº ${p.numero}`);
 }
 
+// ── OWNER STOCK INGRESO ───────────────────────────────────────
+function ownerStockMostrarCampos() {
+  const prod = productos.find(p => p.id === document.getElementById('owner-stock-producto').value);
+  const esUnidades = prod?.tipo_stock === 'unidades';
+  document.getElementById('owner-stock-campos-cajas').style.display = esUnidades ? 'none' : '';
+  document.getElementById('owner-stock-campos-unidades').style.display = esUnidades ? 'block' : 'none';
+  ownerStockCalc();
+}
+function ownerStockCalc() {
+  const prod = productos.find(p => p.id === document.getElementById('owner-stock-producto').value);
+  const prev = document.getElementById('owner-stock-preview');
+  if (!prod) { prev.style.display='none'; return; }
+  if (prod.tipo_stock === 'unidades') {
+    const u = parseFloat(document.getElementById('owner-stock-unidades').value) || 0;
+    document.getElementById('owner-stock-m2').textContent = u + ' unidades';
+    prev.style.display = u > 0 ? 'block' : 'none';
+  } else {
+    const cajas = parseFloat(document.getElementById('owner-stock-cajas').value) || 0;
+    const piezas = parseFloat(document.getElementById('owner-stock-piezas').value) || 0;
+    if (!prod.piezas_por_caja) { prev.style.display='none'; return; }
+    const { m2 } = calcM2Stock(cajas, piezas, prod);
+    document.getElementById('owner-stock-m2').textContent = m2.toFixed(2) + ' m²';
+    prev.style.display = 'block';
+  }
+}
+async function ownerGuardarStock() {
+  const prod = productos.find(p => p.id === document.getElementById('owner-stock-producto').value);
+  if (!prod) { alert('Seleccioná un producto'); return; }
+  const existing = stockData.find(s => s.productoId === prod.id);
+  let data;
+  if (prod.tipo_stock === 'unidades') {
+    const unidades = parseFloat(document.getElementById('owner-stock-unidades').value) || 0;
+    data = { productoId: prod.id, productoNombre: prod.nombre, tipo_stock: 'unidades', unidades, cajas:0, piezasSueltas:0, totalPiezas:0, m2:0, ultimaActualizacion: new Date().toISOString(), actualizadoPor: auth.currentUser?.email || 'dueño' };
+  } else {
+    const cajas = parseFloat(document.getElementById('owner-stock-cajas').value) || 0;
+    const piezasSueltas = parseFloat(document.getElementById('owner-stock-piezas').value) || 0;
+    const { totalPiezas, m2 } = calcM2Stock(cajas, piezasSueltas, prod);
+    data = { productoId: prod.id, productoNombre: prod.nombre, tipo_stock: 'cajas_piezas', cajas, piezasSueltas, totalPiezas, m2, unidades:0, piezas_por_caja: prod.piezas_por_caja||0, m2_por_caja: prod.m2_por_caja||0, ultimaActualizacion: new Date().toISOString(), actualizadoPor: auth.currentUser?.email || 'dueño' };
+  }
+  if (existing) await db.collection('stock').doc(existing.id).set(data);
+  else await db.collection('stock').add(data);
+  document.getElementById('owner-stock-producto').value='';
+  document.getElementById('owner-stock-cajas').value='';
+  document.getElementById('owner-stock-piezas').value='';
+  document.getElementById('owner-stock-unidades').value='';
+  document.getElementById('owner-stock-preview').style.display='none';
+  ownerStockMostrarCampos();
+}
+
 // ── STOCK & PEDIDOS ───────────────────────────────────────────
 
 function calcM2Stock(cajas, piezasSueltas, prod) {
@@ -1919,40 +2018,69 @@ function calcM2Stock(cajas, piezasSueltas, prod) {
 }
 
 // ── EMPLEADO STOCK ────────────────────────────────────────────
+function empStockMostrarCampos() {
+  const sel = document.getElementById('emp-stock-producto');
+  const prod = productos.find(p => p.id === sel.value);
+  const esUnidades = prod?.tipo_stock === 'unidades';
+  document.getElementById('emp-stock-campos-cajas').style.display = esUnidades ? 'none' : '';
+  document.getElementById('emp-stock-campos-unidades').style.display = esUnidades ? 'block' : 'none';
+  empStockCalc();
+}
+
 function empStockCalc() {
   const sel = document.getElementById('emp-stock-producto');
   const prod = productos.find(p => p.id === sel.value);
-  const cajas = parseFloat(document.getElementById('emp-stock-cajas').value) || 0;
-  const piezas = parseFloat(document.getElementById('emp-stock-piezas').value) || 0;
   const prev = document.getElementById('emp-stock-preview');
-  if (!prod || !prod.piezas_por_caja) { prev.style.display='none'; return; }
-  const { m2 } = calcM2Stock(cajas, piezas, prod);
-  document.getElementById('emp-stock-m2').textContent = m2.toFixed(2) + ' m²';
-  prev.style.display = 'block';
+  if (!prod) { prev.style.display='none'; return; }
+  if (prod.tipo_stock === 'unidades') {
+    const u = parseFloat(document.getElementById('emp-stock-unidades').value) || 0;
+    document.getElementById('emp-stock-m2').textContent = u + ' unidades';
+    prev.style.display = u > 0 ? 'block' : 'none';
+  } else {
+    const cajas = parseFloat(document.getElementById('emp-stock-cajas').value) || 0;
+    const piezas = parseFloat(document.getElementById('emp-stock-piezas').value) || 0;
+    if (!prod.piezas_por_caja) { prev.style.display='none'; return; }
+    const { m2 } = calcM2Stock(cajas, piezas, prod);
+    document.getElementById('emp-stock-m2').textContent = m2.toFixed(2) + ' m²';
+    prev.style.display = 'block';
+  }
 }
 
 async function empGuardarStock() {
   const sel = document.getElementById('emp-stock-producto');
   const prod = productos.find(p => p.id === sel.value);
   if (!prod) { alert('Seleccioná un producto'); return; }
-  const cajas = parseFloat(document.getElementById('emp-stock-cajas').value) || 0;
-  const piezasSueltas = parseFloat(document.getElementById('emp-stock-piezas').value) || 0;
-  const { totalPiezas, m2 } = calcM2Stock(cajas, piezasSueltas, prod);
   const existing = stockData.find(s => s.productoId === prod.id);
-  const data = {
-    productoId: prod.id, productoNombre: prod.nombre,
-    cajas, piezasSueltas, totalPiezas, m2,
-    piezas_por_caja: prod.piezas_por_caja || 0,
-    m2_por_caja: prod.m2_por_caja || 0,
-    ultimaActualizacion: new Date().toISOString(),
-    actualizadoPor: auth.currentUser?.email || 'empleado'
-  };
+  let data;
+  if (prod.tipo_stock === 'unidades') {
+    const unidades = parseFloat(document.getElementById('emp-stock-unidades').value) || 0;
+    data = {
+      productoId: prod.id, productoNombre: prod.nombre,
+      tipo_stock: 'unidades', unidades, cajas: 0, piezasSueltas: 0, totalPiezas: 0, m2: 0,
+      ultimaActualizacion: new Date().toISOString(),
+      actualizadoPor: auth.currentUser?.email || 'empleado'
+    };
+  } else {
+    const cajas = parseFloat(document.getElementById('emp-stock-cajas').value) || 0;
+    const piezasSueltas = parseFloat(document.getElementById('emp-stock-piezas').value) || 0;
+    const { totalPiezas, m2 } = calcM2Stock(cajas, piezasSueltas, prod);
+    data = {
+      productoId: prod.id, productoNombre: prod.nombre,
+      tipo_stock: 'cajas_piezas', cajas, piezasSueltas, totalPiezas, m2, unidades: 0,
+      piezas_por_caja: prod.piezas_por_caja || 0,
+      m2_por_caja: prod.m2_por_caja || 0,
+      ultimaActualizacion: new Date().toISOString(),
+      actualizadoPor: auth.currentUser?.email || 'empleado'
+    };
+  }
   if (existing) await db.collection('stock').doc(existing.id).set(data);
   else await db.collection('stock').add(data);
   document.getElementById('emp-stock-cajas').value = '';
   document.getElementById('emp-stock-piezas').value = '';
+  document.getElementById('emp-stock-unidades').value = '';
   document.getElementById('emp-stock-preview').style.display = 'none';
   sel.value = '';
+  empStockMostrarCampos();
   alert('Stock actualizado');
 }
 
@@ -1964,20 +2092,14 @@ function empRenderStock() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <div style="font-weight:600;font-size:15px">${s.productoNombre}</div>
-          <div style="font-size:13px;color:#555;margin-top:3px">
-            <strong>${s.cajas}</strong> cajas · <strong>${s.piezasSueltas}</strong> piezas sueltas · <strong>${(s.m2||0).toFixed(2)} m²</strong>
-          </div>
+          <div style="font-size:13px;color:#555;margin-top:3px">${stockResumen(s)}</div>
           <div style="font-size:11px;color:#aaa;margin-top:2px">Actualizado ${fmtFecha(s.ultimaActualizacion?.slice(0,10))} · ${s.actualizadoPor}</div>
         </div>
         <button class="btn btn-sm btn-edit" onclick="stockEditarInline('${s.id}')"><i class="ti ti-edit"></i></button>
       </div>
       <div id="stock-edit-${s.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f0">
-        <div class="row">
-          <div><label>Cajas</label><input type="number" id="stock-cajas-${s.id}" value="${s.cajas}" inputmode="numeric" oninput="stockPreviewM2('${s.id}')" /></div>
-          <div><label>Piezas sueltas</label><input type="number" id="stock-piezas-${s.id}" value="${s.piezasSueltas}" inputmode="numeric" oninput="stockPreviewM2('${s.id}')" /></div>
-        </div>
-        <div id="stock-m2-preview-${s.id}" style="font-size:13px;color:#555;margin:6px 0 10px"></div>
-        <div style="display:flex;gap:8px">
+        ${stockEditForm(s)}
+        <div style="display:flex;gap:8px;margin-top:8px">
           <button class="btn btn-sm" onclick="stockEditarInline('${s.id}')">Cancelar</button>
           <button class="btn btn-primary btn-sm" onclick="stockGuardarEdicion('${s.id}')"><i class="ti ti-check"></i> Guardar</button>
         </div>
@@ -1991,6 +2113,21 @@ function empRenderCola() {
 }
 
 // ── OWNER STOCK ───────────────────────────────────────────────
+function stockResumen(s) {
+  if (s.tipo_stock === 'unidades') return `<strong>${s.unidades||0}</strong> unidades`;
+  return `<strong>${s.cajas}</strong> cajas · <strong>${s.piezasSueltas}</strong> piezas sueltas · <strong>${(s.m2||0).toFixed(2)} m²</strong>`;
+}
+
+function stockEditForm(s) {
+  if (s.tipo_stock === 'unidades') return `
+    <div><label>Unidades</label><input type="number" id="stock-unidades-${s.id}" value="${s.unidades||0}" inputmode="numeric" /></div>`;
+  return `<div class="row">
+    <div><label>Cajas</label><input type="number" id="stock-cajas-${s.id}" value="${s.cajas}" inputmode="numeric" oninput="stockPreviewM2('${s.id}')" /></div>
+    <div><label>Piezas sueltas</label><input type="number" id="stock-piezas-${s.id}" value="${s.piezasSueltas}" inputmode="numeric" oninput="stockPreviewM2('${s.id}')" /></div>
+  </div>
+  <div id="stock-m2-preview-${s.id}" style="font-size:13px;color:#555;margin:6px 0 10px"></div>`;
+}
+
 function renderOwnerStock() {
   const el = document.getElementById('owner-stock-lista'); if(!el) return;
   if (!stockData.length) { el.innerHTML='<div class="empty">Sin stock registrado aún.</div>'; return; }
@@ -1999,20 +2136,14 @@ function renderOwnerStock() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <div style="font-weight:600;font-size:15px">${s.productoNombre}</div>
-          <div style="font-size:13px;color:#555;margin-top:3px">
-            <strong>${s.cajas}</strong> cajas · <strong>${s.piezasSueltas}</strong> piezas sueltas · <strong>${(s.m2||0).toFixed(2)} m²</strong>
-          </div>
+          <div style="font-size:13px;color:#555;margin-top:3px">${stockResumen(s)}</div>
           <div style="font-size:11px;color:#aaa;margin-top:2px">Actualizado ${fmtFecha(s.ultimaActualizacion?.slice(0,10))} · ${s.actualizadoPor}</div>
         </div>
         <button class="btn btn-sm btn-edit" onclick="stockEditarInline('${s.id}')"><i class="ti ti-edit"></i></button>
       </div>
       <div id="stock-edit-${s.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f0">
-        <div class="row">
-          <div><label>Cajas</label><input type="number" id="stock-cajas-${s.id}" value="${s.cajas}" inputmode="numeric" oninput="stockPreviewM2('${s.id}')" /></div>
-          <div><label>Piezas sueltas</label><input type="number" id="stock-piezas-${s.id}" value="${s.piezasSueltas}" inputmode="numeric" oninput="stockPreviewM2('${s.id}')" /></div>
-        </div>
-        <div id="stock-m2-preview-${s.id}" style="font-size:13px;color:#555;margin:6px 0 10px"></div>
-        <div style="display:flex;gap:8px">
+        ${stockEditForm(s)}
+        <div style="display:flex;gap:8px;margin-top:8px">
           <button class="btn btn-sm" onclick="stockEditarInline('${s.id}')">Cancelar</button>
           <button class="btn btn-primary btn-sm" onclick="stockGuardarEdicion('${s.id}')"><i class="ti ti-check"></i> Guardar</button>
         </div>
@@ -2035,14 +2166,17 @@ function stockPreviewM2(id) {
 
 async function stockGuardarEdicion(id) {
   const s = stockData.find(x => x.id === id); if(!s) return;
-  const cajas = parseFloat(document.getElementById('stock-cajas-'+id).value) || 0;
-  const piezasSueltas = parseFloat(document.getElementById('stock-piezas-'+id).value) || 0;
-  const { totalPiezas, m2 } = calcM2Stock(cajas, piezasSueltas, { piezas_por_caja: s.piezas_por_caja, m2_por_caja: s.m2_por_caja });
-  await db.collection('stock').doc(id).update({
-    cajas, piezasSueltas, totalPiezas, m2,
-    ultimaActualizacion: new Date().toISOString(),
-    actualizadoPor: auth.currentUser?.email || 'dueño'
-  });
+  let update;
+  if (s.tipo_stock === 'unidades') {
+    const unidades = parseFloat(document.getElementById('stock-unidades-'+id).value) || 0;
+    update = { unidades, ultimaActualizacion: new Date().toISOString(), actualizadoPor: auth.currentUser?.email || 'usuario' };
+  } else {
+    const cajas = parseFloat(document.getElementById('stock-cajas-'+id).value) || 0;
+    const piezasSueltas = parseFloat(document.getElementById('stock-piezas-'+id).value) || 0;
+    const { totalPiezas, m2 } = calcM2Stock(cajas, piezasSueltas, { piezas_por_caja: s.piezas_por_caja, m2_por_caja: s.m2_por_caja });
+    update = { cajas, piezasSueltas, totalPiezas, m2, ultimaActualizacion: new Date().toISOString(), actualizadoPor: auth.currentUser?.email || 'usuario' };
+  }
+  await db.collection('stock').doc(id).update(update);
 }
 
 // ── PEDIDOS ───────────────────────────────────────────────────
@@ -2136,6 +2270,10 @@ function renderOwnerPedidos() {
   if (!pedidos.length) { el.innerHTML='<div class="empty">Sin pedidos registrados.</div>'; return; }
   const estadoColor = { pendiente:'#f59e0b', en_produccion:'#3b82f6', completado:'#22c55e' };
   const estadoLabel = { pendiente:'Pendiente', en_produccion:'En producción', completado:'Completado' };
+  const renderItemPed = (it) => {
+    if (it.tipo_stock === 'unidades') return `<div style="font-size:13px;padding:3px 0;color:#555">· ${it.productoNombre}${it.color?' ('+it.color+')':''}: <strong>${it.unidades||0} unidades</strong></div>`;
+    return `<div style="font-size:13px;padding:3px 0;color:#555">· ${it.productoNombre}${it.color?' ('+it.color+')':''}: <strong>${it.cajas||0} cajas</strong>${it.piezasSueltas?` + ${it.piezasSueltas} piezas`:''}  (${(it.m2||0).toFixed(2)} m²)</div>`;
+  };
   const renderPed = (p) => `
     <div class="card" style="margin-bottom:10px;border-left:3px solid ${estadoColor[p.estado]||'#ddd'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
@@ -2145,7 +2283,11 @@ function renderOwnerPedidos() {
         </div>
         <span style="font-size:11px;font-weight:600;color:${estadoColor[p.estado]};background:${estadoColor[p.estado]}22;padding:3px 8px;border-radius:10px">${estadoLabel[p.estado]}</span>
       </div>
-      ${p.items.map(it=>`<div style="font-size:13px;padding:3px 0;color:#555">· ${it.productoNombre}: <strong>${it.cajas} cajas</strong>${it.piezasSueltas?` + ${it.piezasSueltas} piezas`:''}  (${(it.m2||0).toFixed(2)} m²)</div>`).join('')}
+      <div style="font-size:13px;color:#777;margin-bottom:4px">${p.items.length} artículo${p.items.length!==1?'s':''} · <span style="cursor:pointer;color:#7c3aed;text-decoration:underline" onclick="this.closest('.card').querySelector('.ped-detail').style.display=this.closest('.card').querySelector('.ped-detail').style.display==='none'?'block':'none';this.textContent=this.closest('.card').querySelector('.ped-detail').style.display==='block'?'ocultar detalle':'ver detalle'">ver detalle</span></div>
+      <div class="ped-detail" style="display:none;background:#f9f7f3;border-radius:8px;padding:8px;margin-bottom:8px">
+        ${p.items.map(renderItemPed).join('')}
+        ${p.presupuestoNumero?`<div style="font-size:12px;color:#aaa;margin-top:6px">Presupuesto #${p.presupuestoNumero}</div>`:''}
+      </div>
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         ${p.estado==='pendiente'?`<button class="btn btn-sm" onclick="pedCambiarEstado('${p.id}','en_produccion')" style="background:#3b82f6;color:#fff;border-color:#3b82f6"><i class="ti ti-player-play"></i> En producción</button>`:''}
         ${p.estado==='en_produccion'?`<button class="btn btn-sm" onclick="pedCambiarEstado('${p.id}','completado')" style="background:#22c55e;color:#fff;border-color:#22c55e"><i class="ti ti-check"></i> Completado</button>`:''}
