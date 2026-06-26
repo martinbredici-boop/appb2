@@ -918,7 +918,7 @@ async function eliminarMaterial(id) {
 function renderMateriales() {
   const el=document.getElementById('lista-materiales'); if(!el) return;
   if(!materiales.length){el.innerHTML='<div class="empty">Aún no hay materiales.</div>';return;}
-  el.innerHTML=materiales.map(m=>`
+  el.innerHTML=[...materiales].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(m=>`
     <div class="card" style="padding:12px 16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div style="flex:1;min-width:0;">
@@ -1105,7 +1105,7 @@ function calcularCostoProducto(p) {
 function renderProductos() {
   const el=document.getElementById('lista-productos'); if(!el) return;
   if(!productos.length){el.innerHTML='<div class="empty">Aún no hay productos.</div>';return;}
-  el.innerHTML=productos.map(p=>{
+  el.innerHTML=[...productos].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(p=>{
     const costo=calcularCostoProducto(p);
     return `<div class="card" style="padding:12px 16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
