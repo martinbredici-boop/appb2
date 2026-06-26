@@ -1925,6 +1925,18 @@ async function pedConfirmarConversion() {
   // Mapear items del presupuesto a items de pedido
   const items = p.items.filter(it => it.cant > 0).map(it => {
     const prod = productos.find(x => x.nombre.toLowerCase().trim() === (it.modelo||'').toLowerCase().trim());
+    const tipoStock = prod?.tipo_stock || 'cajas_piezas';
+    if (tipoStock === 'unidades') {
+      return {
+        productoId: prod?.id || '',
+        productoNombre: it.modelo || '',
+        color: it.color || '',
+        tipo_stock: 'unidades',
+        unidades: it.cant || 0,
+        cajas: 0, piezasSueltas: 0, m2: 0,
+        piezas_por_caja: 0, m2_por_caja: 0
+      };
+    }
     const m2 = it.cant || 0;
     let cajas = 0, piezasSueltas = 0;
     if (prod?.m2_por_caja > 0) {
@@ -1936,7 +1948,8 @@ async function pedConfirmarConversion() {
       productoId: prod?.id || '',
       productoNombre: it.modelo || '',
       color: it.color || '',
-      cajas, piezasSueltas, m2,
+      tipo_stock: 'cajas_piezas',
+      cajas, piezasSueltas, m2, unidades: 0,
       piezas_por_caja: prod?.piezas_por_caja || 0,
       m2_por_caja: prod?.m2_por_caja || 0
     };
