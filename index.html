@@ -2284,7 +2284,9 @@ function renderOwnerPedidos() {
   const estadoColor = { pendiente:'#f59e0b', en_produccion:'#3b82f6', completado:'#22c55e' };
   const estadoLabel = { pendiente:'Pendiente', en_produccion:'En producción', completado:'Completado' };
   const renderItemPed = (it) => {
-    if (it.tipo_stock === 'unidades') return `<div style="font-size:13px;padding:3px 0;color:#555">· ${it.productoNombre}${it.color?' ('+it.color+')':''}: <strong>${it.unidades||0} unidades</strong></div>`;
+    const prod = productos.find(x => x.id === it.productoId);
+    const esUnidades = (it.tipo_stock || prod?.tipo_stock) === 'unidades';
+    if (esUnidades) return `<div style="font-size:13px;padding:3px 0;color:#555">· ${it.productoNombre}${it.color?' ('+it.color+')':''}: <strong>${it.unidades||it.cant||0} unidades</strong></div>`;
     return `<div style="font-size:13px;padding:3px 0;color:#555">· ${it.productoNombre}${it.color?' ('+it.color+')':''}: <strong>${it.cajas||0} cajas</strong>${it.piezasSueltas?` + ${it.piezasSueltas} piezas`:''}  (${(it.m2||0).toFixed(2)} m²)</div>`;
   };
   const renderPed = (p) => `
@@ -2325,10 +2327,18 @@ function calcColaItems() {
   });
   return Object.entries(activosPorProd).map(([prodId, data]) => {
     const stock = stockData.find(s=>s.productoId===prodId);
+    const prod = productos.find(x=>x.id===prodId);
+    const esUnidades = (data.pedidos[0]?.tipo_stock || prod?.tipo_stock) === 'unidades';
+    if (esUnidades) {
+      const stockU = stock?.unidades || 0;
+      const totalPedidoU = data.pedidos.reduce((s,it)=>s+(it.unidades||it.cant||0),0);
+      const faltaU = Math.max(0, totalPedidoU - stockU);
+      return { prodId, productoNombre:data.productoNombre, pedidos:data.pedidos, esUnidades:true, stockU, totalPedidoU, faltaU, stockM2:0, totalPedidoM2:0, faltaM2:0 };
+    }
     const stockM2 = stock?.m2 || 0;
     const totalPedidoM2 = data.pedidos.reduce((s,it)=>s+(it.m2||0),0);
     const faltaM2 = Math.max(0, totalPedidoM2 - stockM2);
-    return { prodId, productoNombre:data.productoNombre, pedidos:data.pedidos, stockM2, totalPedidoM2, faltaM2 };
+    return { prodId, productoNombre:data.productoNombre, pedidos:data.pedidos, esUnidades:false, stockM2, totalPedidoM2, faltaM2 };
   }).sort((a,b)=>{
     const fa = a.pedidos.map(p=>p.fechaEntrega).sort()[0]||'';
     const fb = b.pedidos.map(p=>p.fechaEntrega).sort()[0]||'';
@@ -2340,6 +2350,25 @@ function renderColaEn(el) {
   const cola = calcColaItems();
   if (!cola.length) { el.innerHTML='<div class="empty">No hay pedidos en curso.</div>'; return; }
   el.innerHTML = cola.map(item => {
+    if (item.esUnidades) {
+      const pct = item.totalPedidoU > 0 ? Math.min(100, (item.stockU/item.totalPedidoU)*100) : 100;
+      const color = pct>=100?'#22c55e':pct>=50?'#f59e0b':'#ef4444';
+      return `<div class="card" style="margin-bottom:10px">
+        <div style="font-weight:600;font-size:15px;margin-bottom:4px">${item.productoNombre}</div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#666;margin-bottom:6px">
+          <span>Stock: <strong>${item.stockU} unidades</strong></span>
+          <span>Pedido total: <strong>${item.totalPedidoU} unidades</strong></span>
+          <span style="color:${item.faltaU>0?'#ef4444':'#22c55e'};font-weight:600">Falta: ${item.faltaU} unidades</span>
+        </div>
+        <div style="background:#e5e5e5;border-radius:4px;height:6px;margin-bottom:10px">
+          <div style="background:${color};height:6px;border-radius:4px;width:${pct}%;transition:width .3s"></div>
+        </div>
+        ${item.pedidos.map(p=>`<div style="font-size:12px;color:#555;padding:3px 0;border-top:1px solid #f0f0f0">
+          · <strong>${p.cliente}</strong> — ${p.unidades||p.cant||0} unidades — entrega ${fmtFecha(p.fechaEntrega)}
+          <span style="font-size:11px;color:#888;margin-left:4px">${p.estado==='en_produccion'?'🔵 En producción':'⏳ Pendiente'}</span>
+        </div>`).join('')}
+      </div>`;
+    }
     const pct = item.totalPedidoM2 > 0 ? Math.min(100, (item.stockM2/item.totalPedidoM2)*100) : 100;
     const color = pct>=100?'#22c55e':pct>=50?'#f59e0b':'#ef4444';
     return `<div class="card" style="margin-bottom:10px">
