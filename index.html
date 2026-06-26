@@ -244,7 +244,8 @@
     <!-- Stock empleado -->
     <div id="emp-sec-stock" class="sub-section">
       <div class="sub-wrap"><div class="sub-tabs">
-        <button class="sub-tab active" onclick="empShowStockSub('ingreso')">Ingreso</button>
+        <button class="sub-tab active" onclick="empShowStockSub('ingreso')">Producto terminado</button>
+        <button class="sub-tab" onclick="empShowStockSub('materiasprimas')">Materias primas</button>
         <button class="sub-tab" onclick="empShowStockSub('cola')">Cola de producción</button>
       </div></div>
 
@@ -270,6 +271,22 @@
           </div>
         </div>
         <div id="emp-stock-lista"><div class="empty">Cargando stock...</div></div>
+      </div>
+
+      <div id="emp-stock-materiasprimas" class="sub-section">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Actualizar stock</span></div>
+          <label>Material</label>
+          <select id="emp-mat-stock-select" onchange="empMatStockMostrarCampos()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:8px;font-family:inherit;font-size:14px;background:#fff;margin-bottom:12px"><option value="">— Seleccioná —</option></select>
+          <div id="emp-mat-stock-campos" style="display:none">
+            <label id="emp-mat-stock-label">Cantidad</label>
+            <input type="number" id="emp-mat-stock-cantidad" placeholder="0" inputmode="decimal" step="any" style="font-size:22px;padding:12px;" />
+            <div class="actions">
+              <button class="btn btn-primary" onclick="empMatStockGuardar()" style="flex:1;padding:13px;font-size:16px"><i class="ti ti-device-floppy"></i> Guardar stock</button>
+            </div>
+          </div>
+        </div>
+        <div id="emp-stock-materiales-lista"><div class="empty">Cargando...</div></div>
       </div>
 
       <div id="emp-stock-cola" class="sub-section">
@@ -762,7 +779,7 @@ function cerrarSesion() { auth.signOut(); }
 function setupOwnerListeners() {
   unsubs.push(db.collection('materiales').onSnapshot(snap => {
     materiales = snap.docs.map(d => ({id:d.id,...d.data()}));
-    renderMateriales(); renderIngredientesForm(); actualizarSelectProducto(); renderStockMateriales();
+    renderMateriales(); renderIngredientesForm(); actualizarSelectProducto(); renderStockMateriales(); empRenderStockMateriales();
   }));
   unsubs.push(db.collection('operarios').onSnapshot(snap => {
     operarios = snap.docs.map(d => ({id:d.id,...d.data()}));
@@ -810,7 +827,7 @@ function setupOwnerListeners() {
   }));
   unsubs.push(db.collection('stockMateriales').onSnapshot(snap => {
     stockMateriales = snap.docs.map(d => ({id:d.id,...d.data()}));
-    renderStockMateriales();
+    renderStockMateriales(); empRenderStockMateriales();
   }));
   initFechasGastos(); initOwnerProd();
 }
@@ -1398,9 +1415,37 @@ function empShowSub(sec) {
   document.getElementById('emp-sec-stock').classList.toggle('active', sec==='stock');
 }
 function empShowStockSub(sec) {
-  document.querySelectorAll('#emp-sec-stock .sub-tab').forEach((b,i)=>b.classList.toggle('active',['ingreso','cola'][i]===sec));
+  document.querySelectorAll('#emp-sec-stock .sub-tab').forEach((b,i)=>b.classList.toggle('active',['ingreso','materiasprimas','cola'][i]===sec));
   document.getElementById('emp-stock-ingreso').classList.toggle('active', sec==='ingreso');
+  document.getElementById('emp-stock-materiasprimas').classList.toggle('active', sec==='materiasprimas');
   document.getElementById('emp-stock-cola').classList.toggle('active', sec==='cola');
+}
+
+function empMatStockMostrarCampos() {
+  const sel = document.getElementById('emp-mat-stock-select');
+  const mat = materiales.find(m => m.id === sel.value);
+  const campos = document.getElementById('emp-mat-stock-campos');
+  if (!mat) { campos.style.display='none'; return; }
+  document.getElementById('emp-mat-stock-label').textContent = `Cantidad (${mat.unidad||'unidad'})`;
+  const actual = stockMateriales.find(s => s.materialId === mat.id);
+  document.getElementById('emp-mat-stock-cantidad').value = actual?.cantidad || '';
+  campos.style.display = 'block';
+}
+
+async function empMatStockGuardar() {
+  const matId = document.getElementById('emp-mat-stock-select').value;
+  if (!matId) return;
+  const cantidad = parseFloat(document.getElementById('emp-mat-stock-cantidad').value) || 0;
+  const mat = materiales.find(m => m.id === matId);
+  const existing = stockMateriales.find(s => s.materialId === matId);
+  const data = { materialId: matId, materialNombre: mat.nombre, unidad: mat.unidad||'', cantidad, ultimaActualizacion: new Date().toISOString(), actualizadoPor: auth.currentUser?.email||'' };
+  if (existing) {
+    await db.collection('stockMateriales').doc(existing.id).update(data);
+  } else {
+    await db.collection('stockMateriales').add(data);
+  }
+  document.getElementById('emp-mat-stock-select').value = '';
+  document.getElementById('emp-mat-stock-campos').style.display = 'none';
 }
 
 // ── EMPLEADO PRODUCTOS ────────────────────────────────────────
@@ -2414,6 +2459,26 @@ function renderColaEn(el) {
 function renderCola() {
   const el = document.getElementById('owner-cola-lista'); if(!el) return;
   renderColaEn(el);
+}
+
+function empRenderStockMateriales() {
+  const el = document.getElementById('emp-stock-materiales-lista'); if(!el) return;
+  const sel = document.getElementById('emp-mat-stock-select');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Seleccioná —</option>' + [...materiales].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(m=>`<option value="${m.id}">${m.nombre}${m.unidad?' ('+m.unidad+')':''}</option>`).join('');
+    sel.value = cur;
+  }
+  if (!stockMateriales.length) { el.innerHTML='<div class="empty">Sin stock cargado.</div>'; return; }
+  const sorted = [...stockMateriales].sort((a,b)=>a.materialNombre.localeCompare(b.materialNombre,'es'));
+  el.innerHTML = sorted.map(s=>`
+    <div class="card" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-weight:500;font-size:14px">${s.materialNombre}</div>
+        <div style="font-size:12px;color:#888">${s.ultimaActualizacion?fmtFecha(s.ultimaActualizacion.slice(0,10)):''} · ${s.actualizadoPor||''}</div>
+      </div>
+      <div style="font-size:20px;font-weight:600;color:#3b82f6">${s.cantidad} <span style="font-size:13px;font-weight:400;color:#888">${s.unidad||''}</span></div>
+    </div>`).join('');
 }
 
 // ── STOCK MATERIAS PRIMAS ─────────────────────────────────────
