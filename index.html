@@ -601,7 +601,8 @@
   <!-- ── STOCK ── -->
   <div id="main-stock" class="main-section">
     <div class="sub-wrap"><div class="sub-tabs">
-      <button class="sub-tab active" onclick="showSub('stock','stock')">Stock</button>
+      <button class="sub-tab active" onclick="showSub('stock','stock')">Producto terminado</button>
+      <button class="sub-tab" onclick="showSub('stock','materiasprimas')">Materias primas</button>
       <button class="sub-tab" onclick="showSub('stock','pedidos')">Pedidos</button>
       <button class="sub-tab" onclick="showSub('stock','cola')">Cola</button>
     </div></div>
@@ -629,6 +630,23 @@
         </div>
       </div>
       <div id="owner-stock-lista"><div class="empty">Cargando stock...</div></div>
+    </div>
+
+    <!-- Materias primas -->
+    <div id="stock-materiasprimas" class="sub-section">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Actualizar stock</span></div>
+        <label>Material</label>
+        <select id="mat-stock-select" onchange="matStockMostrarCampos()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:8px;font-family:inherit;font-size:14px;background:#fff;margin-bottom:12px"><option value="">— Seleccioná —</option></select>
+        <div id="mat-stock-campos" style="display:none">
+          <label id="mat-stock-label">Cantidad</label>
+          <input type="number" id="mat-stock-cantidad" placeholder="0" inputmode="decimal" step="any" style="font-size:22px;padding:12px;" />
+          <div class="actions">
+            <button class="btn btn-primary" onclick="matStockGuardar()" style="flex:1;padding:13px;font-size:16px"><i class="ti ti-device-floppy"></i> Guardar stock</button>
+          </div>
+        </div>
+      </div>
+      <div id="stock-materiales-lista"><div class="empty">Cargando...</div></div>
     </div>
 
     <!-- Pedidos -->
@@ -702,7 +720,7 @@ db.enablePersistence().catch(() => {});
 const OWNER_EMAILS = ['martin.bredici@gmail.com', 'alejandrojosegarcia77@gmail.com', 'danielcostanzo06@gmail.com', 'sofia.bredici@gmail.com'];
 
 // ── ESTADO ────────────────────────────────────────────────────
-let materiales = [], productos = [], margenes = [], operarios = [], gastos = [], produccion = [], stockData = [], pedidos = [];
+let materiales = [], productos = [], margenes = [], operarios = [], gastos = [], produccion = [], stockData = [], pedidos = [], stockMateriales = [];
 let pedItemsTemp = [];
 let ingTemp = [], editandoId = null, editandoMatId = null, editandoOpId = null;
 let unsubs = [];
@@ -744,7 +762,7 @@ function cerrarSesion() { auth.signOut(); }
 function setupOwnerListeners() {
   unsubs.push(db.collection('materiales').onSnapshot(snap => {
     materiales = snap.docs.map(d => ({id:d.id,...d.data()}));
-    renderMateriales(); renderIngredientesForm(); actualizarSelectProducto();
+    renderMateriales(); renderIngredientesForm(); actualizarSelectProducto(); renderStockMateriales();
   }));
   unsubs.push(db.collection('operarios').onSnapshot(snap => {
     operarios = snap.docs.map(d => ({id:d.id,...d.data()}));
@@ -789,6 +807,10 @@ function setupOwnerListeners() {
   unsubs.push(db.collection('pedidos').orderBy('fechaEntrega','asc').onSnapshot(snap => {
     pedidos = snap.docs.map(d => ({id:d.id,...d.data()}));
     renderOwnerPedidos(); renderCola(); empRenderCola();
+  }));
+  unsubs.push(db.collection('stockMateriales').onSnapshot(snap => {
+    stockMateriales = snap.docs.map(d => ({id:d.id,...d.data()}));
+    renderStockMateriales();
   }));
   initFechasGastos(); initOwnerProd();
 }
@@ -843,7 +865,7 @@ function showMain(tab) {
   if(tab==='stock') { renderOwnerStock(); renderOwnerPedidos(); renderCola(); }
 }
 function showSub(main, sub) {
-  const MAP = { costos:['materiales','operarios','productos','calcular'], gastos:['cargar','lista','analisis'], produccion:['carga','resumen'], presupuestos:['nuevo','historial'], stock:['stock','pedidos','cola'] };
+  const MAP = { costos:['materiales','operarios','productos','calcular'], gastos:['cargar','lista','analisis'], produccion:['carga','resumen'], presupuestos:['nuevo','historial'], stock:['stock','materiasprimas','pedidos','cola'] };
   const parent = document.getElementById('main-'+main);
   parent.querySelectorAll('.sub-tab').forEach((b,i)=>b.classList.toggle('active', MAP[main][i]===sub));
   parent.querySelectorAll('.sub-section').forEach(s=>s.classList.remove('active'));
@@ -2392,6 +2414,55 @@ function renderColaEn(el) {
 function renderCola() {
   const el = document.getElementById('owner-cola-lista'); if(!el) return;
   renderColaEn(el);
+}
+
+// ── STOCK MATERIAS PRIMAS ─────────────────────────────────────
+function matStockMostrarCampos() {
+  const sel = document.getElementById('mat-stock-select');
+  const mat = materiales.find(m => m.id === sel.value);
+  const campos = document.getElementById('mat-stock-campos');
+  if (!mat) { campos.style.display='none'; return; }
+  document.getElementById('mat-stock-label').textContent = `Cantidad (${mat.unidad||'unidad'})`;
+  const actual = stockMateriales.find(s => s.materialId === mat.id);
+  document.getElementById('mat-stock-cantidad').value = actual?.cantidad || '';
+  campos.style.display = 'block';
+}
+
+async function matStockGuardar() {
+  const matId = document.getElementById('mat-stock-select').value;
+  if (!matId) return;
+  const cantidad = parseFloat(document.getElementById('mat-stock-cantidad').value) || 0;
+  const mat = materiales.find(m => m.id === matId);
+  const existing = stockMateriales.find(s => s.materialId === matId);
+  const data = { materialId: matId, materialNombre: mat.nombre, unidad: mat.unidad||'', cantidad, ultimaActualizacion: new Date().toISOString(), actualizadoPor: auth.currentUser?.email||'' };
+  if (existing) {
+    await db.collection('stockMateriales').doc(existing.id).update(data);
+  } else {
+    await db.collection('stockMateriales').add(data);
+  }
+  document.getElementById('mat-stock-select').value = '';
+  document.getElementById('mat-stock-campos').style.display = 'none';
+}
+
+function renderStockMateriales() {
+  const el = document.getElementById('stock-materiales-lista'); if(!el) return;
+  // Poblar select
+  const sel = document.getElementById('mat-stock-select');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Seleccioná —</option>' + [...materiales].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(m=>`<option value="${m.id}">${m.nombre}${m.unidad?' ('+m.unidad+')':''}</option>`).join('');
+    sel.value = cur;
+  }
+  if (!stockMateriales.length) { el.innerHTML='<div class="empty">Sin stock cargado.</div>'; return; }
+  const sorted = [...stockMateriales].sort((a,b)=>a.materialNombre.localeCompare(b.materialNombre,'es'));
+  el.innerHTML = sorted.map(s=>`
+    <div class="card" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-weight:500;font-size:14px">${s.materialNombre}</div>
+        <div style="font-size:12px;color:#888">${s.ultimaActualizacion?fmtFecha(s.ultimaActualizacion.slice(0,10)):''} · ${s.actualizadoPor||''}</div>
+      </div>
+      <div style="font-size:20px;font-weight:600;color:#3b82f6">${s.cantidad} <span style="font-size:13px;font-weight:400;color:#888">${s.unidad||''}</span></div>
+    </div>`).join('');
 }
 </script>
 </body>
