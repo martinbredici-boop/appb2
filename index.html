@@ -2167,7 +2167,7 @@ async function empGuardarStock() {
 function empRenderStock() {
   const el = document.getElementById('emp-stock-lista'); if(!el) return;
   if (!stockData.length) { el.innerHTML='<div class="empty">Sin stock registrado.</div>'; return; }
-  el.innerHTML = stockData.map(s => `
+  el.innerHTML = [...stockData].sort((a,b)=>a.productoNombre.localeCompare(b.productoNombre,'es')).map(s => `
     <div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
@@ -2211,7 +2211,7 @@ function stockEditForm(s) {
 function renderOwnerStock() {
   const el = document.getElementById('owner-stock-lista'); if(!el) return;
   if (!stockData.length) { el.innerHTML='<div class="empty">Sin stock registrado aún.</div>'; return; }
-  el.innerHTML = stockData.map(s => `
+  el.innerHTML = [...stockData].sort((a,b)=>a.productoNombre.localeCompare(b.productoNombre,'es')).map(s => `
     <div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
